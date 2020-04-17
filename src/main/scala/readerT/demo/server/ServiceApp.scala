@@ -12,8 +12,7 @@ object ServiceApp extends IOApp {
 
   def stream: Stream[IO, Unit] = for {
     handlers <- Stream.eval(Handlers.readerT[IO].run(config))
-    _ <- StreamA(handlers)
-    _ <- StreamB(handlers)
+    _ <- StreamA(handlers).merge(StreamA(handlers))
   } yield ()
 
   override def run(args: List[String]): IO[ExitCode] = stream.compile.drain.as(ExitCode.Success)
