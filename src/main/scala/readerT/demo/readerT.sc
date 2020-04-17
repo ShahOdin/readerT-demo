@@ -1,8 +1,7 @@
 import cats.data.ReaderT
-import cats.Monad
+import cats.{Applicative, Monad}
 import cats.effect.{ExitCode, IO, IOApp}
 import fs2.Stream
-
 import cats.syntax.apply._
 import cats.syntax.functor._
 
@@ -13,10 +12,9 @@ object Config {
   trait BazConfig
 }
 
-
 case class Clients[F[_]](fooClient: Clients.FooClient[F], barClient: Clients.BarClient[F], bazClient: Clients.BazClient[F])
 object Clients {
-  def readerT[F[_] : Monad]: ReaderT[F, Config, Clients[F]] = (
+  def readerT[F[_] : Applicative]: ReaderT[F, Config, Clients[F]] = (
     FooClient.readerT[F],
     BarClient.readerT[F],
     BazClient.readerT[F]
@@ -39,23 +37,20 @@ object Clients {
     def readerT[F[_]]: ReaderT[F, Config, FooClient[F]] = readerT_.local(_.fooConfig)
     private def readerT_[F[_]]: ReaderT[F, Config.FooConfig, FooClient[F]] = ???
   }
-
 }
 
 case class Handlers[F[_]](quxHandler: Handlers.QuxHandler[F], quuxHandler: Handlers.QuuxHandler[F])
 object Handlers {
-  def readerT[F[_] : Monad]: ReaderT[F, Config, Handlers[F]] = {
-    Clients.readerT.andThen(
-      (
-        QuxHandler.readerT[F],
-        QuuxHandler.readerT[F]
+  def readerT[F[_]: Monad]: ReaderT[F, Config, Handlers[F]] = Clients.readerT.andThen(
+    (
+      QuxHandler.readerT[F],
+      QuuxHandler.readerT[F]
       ).mapN(Handlers.apply)
-    )
-  }
+  )
 
   trait QuxHandler[F[_]]
   object QuxHandler {
-    def readerT[F[_] : Monad]: ReaderT[F, Clients[F], QuxHandler[F]] = readerT_.local(
+    def readerT[F[_]]: ReaderT[F, Clients[F], QuxHandler[F]] = readerT_.local(
       clients => (clients.fooClient, clients.barClient)
     )
 
@@ -64,7 +59,7 @@ object Handlers {
 
   trait QuuxHandler[F[_]]
   object QuuxHandler {
-    def readerT[F[_] : Monad]: ReaderT[F, Clients[F], QuuxHandler[F]] = readerT_.local(
+    def readerT[F[_]]: ReaderT[F, Clients[F], QuuxHandler[F]] = readerT_.local(
       clients => (clients.barClient, clients.bazClient)
     )
 
@@ -88,7 +83,6 @@ object Streams {
       StreamB.readerT[F]
       ).mapN(Streams.apply)
   )
-
 }
 
 object ServiceApp extends IOApp {
