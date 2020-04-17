@@ -45,15 +45,12 @@ object Clients {
 case class Handlers[F[_]](quxHandler: Handlers.QuxHandler[F], quuxHandler: Handlers.QuuxHandler[F])
 object Handlers {
   def readerT[F[_] : Monad]: ReaderT[F, Config, Handlers[F]] = {
-    Clients.readerT
-      .andThen(
-        (
-          QuxHandler.readerT[F],
-          QuuxHandler.readerT[F]
-          ).tupled
-      ).map { case (qux, quux) =>
-      Handlers(qux, quux)
-    }
+    Clients.readerT.andThen(
+      (
+        QuxHandler.readerT[F],
+        QuuxHandler.readerT[F]
+      ).mapN(Handlers.apply)
+    )
   }
 
   trait QuxHandler[F[_]]
@@ -76,20 +73,30 @@ object Handlers {
 
 }
 
+case class Streams[F[_]](streamA: Stream[F, Unit], streamB: Stream[F, Unit])
+object Streams {
+  object StreamA {
+    def readerT[F[_]]: ReaderT[F, Handlers[F], Stream[F, Unit]] = ???
+  }
+  object StreamB {
+    def readerT[F[_]]: ReaderT[F, Handlers[F], Stream[F, Unit]] = ???
+  }
+
+  def readerT[F[_]: Monad]: ReaderT[F, Config, Streams[F]] = Handlers.readerT[F].andThen(
+    (
+      StreamA.readerT[F],
+      StreamB.readerT[F]
+      ).mapN(Streams.apply)
+  )
+
+}
 
 object ServiceApp extends IOApp {
   val config: Config = ???
 
-  object StreamA {
-    def apply[F[_]](handlers: Handlers[F]): Stream[F, Unit] = ???
-  }
-  object StreamB {
-    def apply[F[_]](handlers: Handlers[F]): Stream[F, Unit] = ???
-  }
-
   def stream: Stream[IO, Unit] = for {
-    handlers <- Stream.eval(Handlers.readerT[IO].run(config))
-    _ <- StreamA(handlers).merge(StreamA(handlers))
+    streams <- Stream.eval(Streams.readerT[IO].run(config))
+    _ <- streams.streamA.merge(streams.streamB)
   } yield ()
   override def run(args: List[String]): IO[ExitCode] = stream.compile.drain.as(ExitCode.Success)
 }

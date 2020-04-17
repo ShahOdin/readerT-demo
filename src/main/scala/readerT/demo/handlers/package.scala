@@ -15,10 +15,8 @@ package object handlers {
           (
             QuxHandler.readerT[F],
             QuuxHandler.readerT[F]
-            ).tupled
-        ).map { case (qux, quux) =>
-        Handlers(qux, quux)
-      }
+            ).mapN(Handlers.apply)
+        )
     }
   }
 
